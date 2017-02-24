@@ -14,6 +14,9 @@ import org.jlab.detector.base.DetectorType;
 import org.jlab.geom.prim.Line3D;
 import org.jlab.geom.prim.Path3D;
 import org.jlab.geom.prim.Point3D;
+import org.jlab.geom.prim.Vector3D;
+import org.jlab.io.base.DataBank;
+import org.jlab.io.base.DataEvent;
 
 /**
  *
@@ -22,9 +25,9 @@ import org.jlab.geom.prim.Point3D;
 public class DetectorResponse {
     
     private DetectorDescriptor  descriptor  = new DetectorDescriptor();
-    private Vector3             hitPosition = new Vector3();
+    private Vector3D             hitPosition = new Vector3D();
     //private Point3D             hitPosition = new Vector3();
-    private Vector3             hitPositionMatched = new Vector3();
+    private Vector3D             hitPositionMatched = new Vector3D();
     private Double             detectorTime = 0.0;
     private Double           detectorEnergy = 0.0;
     private Double           particlePath   = 0.0;
@@ -32,6 +35,10 @@ public class DetectorResponse {
     
     public DetectorResponse(){
         
+    }
+    
+    public DetectorResponse(int sector, int layer, int component){
+        descriptor.setSectorLayerComponent(sector, layer, component);
     }
     
     public void   setTime(double time){ this.detectorTime = time;}
@@ -43,31 +50,20 @@ public class DetectorResponse {
     public double getTime(){ return this.detectorTime;}
     public double getEnergy(){ return this.detectorEnergy; }
     public double getPath(){ return this.particlePath;}
-    public Vector3 getPosition(){ return this.hitPosition;}
-    public Vector3 getMatchedPosition(){ return this.hitPositionMatched;}
+    
+    public Vector3D getPosition(){ return this.hitPosition;}
+    public Vector3D getMatchedPosition(){ return this.hitPositionMatched;}
+    
+    public double   getMatchedDistance(){ 
+        return Math.sqrt( 
+                (this.hitPosition.x()-this.hitPositionMatched.x()) * (this.hitPosition.x()-this.hitPositionMatched.x())
+                        + (this.hitPosition.y()-this.hitPositionMatched.y()) * (this.hitPosition.y()-this.hitPositionMatched.y())
+                        + (this.hitPosition.z()-this.hitPositionMatched.z()) * (this.hitPosition.z()-this.hitPositionMatched.z())
+        );
+    }
     
     public DetectorDescriptor getDescriptor(){ return this.descriptor;}
     
-    
-    public static List<DetectorResponse>  getListByLayer(List<DetectorResponse> list, DetectorType type, int layer){
-        List<DetectorResponse> result = new ArrayList<DetectorResponse>();
-        for(DetectorResponse res : list){
-            if(res.getDescriptor().getType()==type&&res.getDescriptor().getLayer()==layer){
-                result.add(res);
-            }
-        }
-        return result;
-    }
-    
-    public static List<DetectorResponse>  getListBySector(List<DetectorResponse> list, DetectorType type, int sector){
-        List<DetectorResponse> result = new ArrayList<DetectorResponse>();
-        for(DetectorResponse res : list){
-            if(res.getDescriptor().getType()==type&&res.getDescriptor().getSector()==sector){
-                result.add(res);
-            }
-        }
-        return result;
-    }
     
     public int getAssociation(){ return this.association;}
     public void setAssociation(int asc){ this.association = asc;}
@@ -94,6 +90,128 @@ public class DetectorResponse {
         return index;
     }
     
+    /**
+     * reads DetectorResponse List from DataEvent class. it has to contain
+     * branches:
+     *   sector and layer (type BYTE), 
+     *   x,y,z (type FLOAT)
+     *   energy,time (type FLOAT)
+     * @param event
+     * @param bankName
+     * @param type
+     * @return 
+     */
+    public static List<DetectorResponse>  readHipoEvent(DataEvent event, 
+            String bankName, DetectorType type){        
+        List<DetectorResponse> responseList = new ArrayList<DetectorResponse>();
+        if(event.hasBank(bankName)==true){
+            DataBank bank = event.getBank(bankName);
+            int nrows = bank.rows();
+            for(int row = 0; row < nrows; row++){
+                int sector = bank.getByte("sector", row);
+                int  layer = bank.getByte("layer",  row);
+                DetectorResponse  response = new DetectorResponse(sector,layer,0);
+                response.getDescriptor().setType(type);
+                float x = bank.getFloat("x", row);
+                float y = bank.getFloat("y", row);
+                float z = bank.getFloat("z", row);
+                response.setPosition(x, y, z);
+                response.setEnergy(bank.getFloat("energy", row));
+                response.setTime(bank.getFloat("time", row));
+                responseList.add(response);
+            }
+        }
+        return responseList;
+    }
+    /*
+    public static List<DetectorResponse>  readHipoEvent(DataEvent event, 
+            String bankName, DetectorType type, double energyThreshold){
+        
+        List<DetectorResponse> responseList = new ArrayList<DetectorResponse>();
+        if(event.hasBank(bankName)==true){
+            DataBank bank = event.getBank(bankName);
+            int nrows = bank.rows();
+            for(int row = 0; row < nrows; row++){
+                int sector = bank.getByte("sector", row);
+                int  layer = bank.getByte("layer",  row);
+                DetectorResponse  response = new DetectorResponse(sector,layer,0);
+                response.getDescriptor().setType(type);
+                float x = bank.getFloat("x", row);
+                float y = bank.getFloat("y", row);
+                float z = bank.getFloat("z", row);
+                response.setPosition(x, y, z);
+                response.setEnergy(bank.getFloat("energy", row));
+                response.setTime(bank.getFloat("time", row));
+                if(response.getEnergy()>energyThreshold){
+                    responseList.add(response);
+                }
+            }
+        }
+        return responseList;
+    }*/
+    /**
+     * Reads a HIPO event, constructs list of detector responses then returns only
+     * entries with energy above given threshold.
+     * @param event
+     * @param bankName
+     * @param type
+     * @param minEnergy
+     * @return 
+     */
+    public static List<DetectorResponse>  readHipoEvent(DataEvent event, 
+            String bankName, DetectorType type, double minEnergy){ 
+        List<DetectorResponse> responses = DetectorResponse.readHipoEvent(event, bankName, type);
+        return DetectorResponse.getListByEnergy(responses, minEnergy);
+    }
+    
+    /**
+     * Returns a list of detectorResponses where all entries have energy above given threshold.
+     * @param responses list of detector responses.
+     * @param minEnergy minimum energy accepted
+     * @return 
+     */
+    public static List<DetectorResponse>  getListByEnergy(List<DetectorResponse> responses, double minEnergy){
+        List<DetectorResponse> responseList = new ArrayList<DetectorResponse>();
+        for(DetectorResponse r : responses){
+            if(r.getEnergy()>minEnergy){
+                responseList.add(r);
+            }
+        }
+        return responseList;
+    }
+    
+    public static List<DetectorResponse>  getListBySector(List<DetectorResponse> list, DetectorType type, int sector){
+        List<DetectorResponse> result = new ArrayList<DetectorResponse>();
+        for(DetectorResponse res : list){
+            if(res.getDescriptor().getType()==type&&res.getDescriptor().getSector()==sector){
+                result.add(res);
+            }
+        }
+        return result;
+    }
+    
+    public static List<DetectorResponse>  getListByLayer(List<DetectorResponse> list, DetectorType type, int layer){
+        List<DetectorResponse> result = new ArrayList<DetectorResponse>();
+        for(DetectorResponse res : list){
+            if(res.getDescriptor().getType()==type&&res.getDescriptor().getLayer()==layer){
+                result.add(res);
+            }
+        }
+        return result;
+    }
+        
+    public static List<DetectorResponse>  getListBySectorLayer(List<DetectorResponse> list, 
+            DetectorType type, int sector, int layer){
+        List<DetectorResponse> result = new ArrayList<DetectorResponse>();
+        for(DetectorResponse res : list){
+            if(res.getDescriptor().getType()==type
+                    &&res.getDescriptor().getSector()==sector
+                    &&res.getDescriptor().getLayer()==layer){
+                result.add(res);
+            }
+        }
+        return result;
+    }
     
     @Override
     public String toString(){
@@ -107,16 +225,17 @@ public class DetectorResponse {
         str.append(String.format(" PINDX [%3d] ", 
                 this.getAssociation()
                 ));
-        str.append(String.format(" T/P/E %8.4f %8.4f %8.4f", this.detectorTime,
+        str.append(String.format(" T/P/E %6.2f %6.2f %6.2f", this.detectorTime,
                 this.particlePath,
                 this.detectorEnergy));
-        str.append(String.format(" POS [ %9.3f %9.3f %9.3f ]", 
+        str.append(String.format(" POS [ %8.2f %8.2f %8.2f ]", 
                 this.hitPosition.x(),this.hitPosition.y(),this.hitPosition.z()));
-        str.append(String.format(" ACCURACY [ %9.3f %9.3f %9.3f ] ",
+        str.append(String.format(" ACCURACY [ %8.3f %8.3f %8.3f ] ",
                 this.hitPosition.x()-this.hitPositionMatched.x(),
                 this.hitPosition.y()-this.hitPositionMatched.y(),
                 this.hitPosition.z()-this.hitPositionMatched.z()
                 ));
+        str.append(String.format(" %8.4f", this.getMatchedDistance()));
         return str.toString();
     }
 }

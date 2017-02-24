@@ -5,7 +5,10 @@
  */
 package org.jlab.io.hipo;
 
+import java.util.List;
+import org.jlab.hipo.data.HipoNodeType;
 import org.jlab.hipo.schema.Schema;
+import org.jlab.hipo.schema.Schema.SchemaEntry;
 import org.jlab.io.base.DataDescriptor;
 
 /**
@@ -16,12 +19,30 @@ public class HipoDataDescriptor implements DataDescriptor {
 
     private final Schema hipoSchema = new Schema();
     
+    public HipoDataDescriptor(){
+
+    }
+     
+    public HipoDataDescriptor(Schema schema){
+        this.init(schema);
+    }
+    
+    public final void init(Schema schema){
+        hipoSchema.copy(schema);
+    }
+    
     public void init(String s) {
         this.hipoSchema.setFromText(s);
     }
 
+    @Override
     public String[] getEntryList() {
-        String[] entries = new String[1];
+        List<String>  entryList = hipoSchema.schemaEntryList();
+        String[] entries = new String[entryList.size()];
+        int counter = 0;
+        for(int i = 0; i < entryList.size(); i++){
+            entries[i] = entryList.get(i);
+        }
         return entries;
     }
 
@@ -41,7 +62,18 @@ public class HipoDataDescriptor implements DataDescriptor {
     }
 
     public int getProperty(String property_name, String entry_name) {
-        return 1;
+        if(property_name.compareTo("type")==0){
+            SchemaEntry entry = this.hipoSchema.getEntry(entry_name);
+            if(entry!=null){
+                if(entry.getType()==HipoNodeType.BYTE)  return 1;
+                if(entry.getType()==HipoNodeType.SHORT) return 2;
+                if(entry.getType()==HipoNodeType.INT) return 3;
+                if(entry.getType()==HipoNodeType.FLOAT) return 5;
+                if(entry.getType()==HipoNodeType.DOUBLE) return 6;
+                return 0;
+            }
+        }
+        return 0;
     }
 
     public int getProperty(String property_name) {
@@ -57,7 +89,7 @@ public class HipoDataDescriptor implements DataDescriptor {
     }
 
     public void show() {
-        
+        System.out.println(this.hipoSchema.toString());
     }
 
     public String getName() {

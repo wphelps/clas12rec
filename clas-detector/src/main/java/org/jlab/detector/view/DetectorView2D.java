@@ -71,8 +71,38 @@ public class DetectorView2D extends JPanel implements MouseMotionListener, Mouse
             entry.getValue().fill(data, options);
         }
     }
+    public static List<DetectorShape2D> createSector(DetectorType type, int sector,
+            int nLayers, Color color, int startRadius, int layerWidth){
+        return DetectorView2D.createSector(type, sector, 1, nLayers, color, startRadius, layerWidth);
+    }
     
-   
+    public static List<DetectorShape2D> createSector(DetectorType type, int sector,
+            int startLayer,
+            int endLayer, Color color, int startRadius, int layerWidth){
+        
+        List<DetectorShape2D>  shapes = new ArrayList<DetectorShape2D>(); 
+        double start_angle = -25.0;
+        double   end_angle = 25.0;
+        double    rotation = Math.toRadians((sector+3)*60-60);
+        Color shapeColor = color;
+        
+        for(int i = startLayer ; i <= endLayer; i++){
+            
+            DetectorShape2D shape = new DetectorShape2D();
+            shape.getDescriptor().setType(type);
+            double rs = startRadius + (i-1)*layerWidth;
+            double re = startRadius + (i)*layerWidth;
+            
+            shape.getDescriptor().setSectorLayerComponent(sector, i, 0);
+            shape.createArc(rs, re, start_angle,end_angle);
+            shape.setColor(shapeColor.getRed(), shapeColor.getGreen(), shapeColor.getBlue());
+            shape.getShapePath().rotateZ(rotation);
+            shapes.add(shape);
+            
+            shapeColor = shapeColor.darker();
+        }
+        return shapes;
+    }
     
     @Override
     public void paint(Graphics g){ 
@@ -100,6 +130,8 @@ public class DetectorView2D extends JPanel implements MouseMotionListener, Mouse
         this.colorAxis.drawAxis(g2d, 10, h-20);
         
     }
+    
+    
     
     public List<String> getLayerNames(){ return this.viewLayerNames;}
     

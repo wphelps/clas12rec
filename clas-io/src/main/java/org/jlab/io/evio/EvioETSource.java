@@ -35,6 +35,7 @@ import org.jlab.coda.jevio.EvioException;
 import org.jlab.io.base.DataEvent;
 import org.jlab.io.base.DataEventList;
 import org.jlab.io.base.DataSource;
+import org.jlab.io.base.DataSourceType;
 
 
 /**
@@ -44,13 +45,14 @@ import org.jlab.io.base.DataSource;
 public class EvioETSource implements DataSource {
     
     private Boolean  connectionOK = false;
-    private String   etRingHost   = "";
+    private String   etRingHost   = "localhost";
     private Integer  etRingPort   = 11111;
     private EtSystem sys = null;
     private EtAttachment  myAttachment = null;
     private Boolean       remoteConnection = false;
     private Integer       MAX_NEVENTS = 20;
     private int           currentEventPosition = 0;
+    
     List<EvioDataEvent>   readerEvents     = new ArrayList<EvioDataEvent>();
     
     public EvioETSource(){
@@ -77,10 +79,10 @@ public class EvioETSource implements DataSource {
     }
 
     public void open(String filename) {
-        System.out.println("[ETSOURCE] --> connecting to host : [" +
+        System.out.println("[ETSOURCE] -->>> connecting to host : [" +
                 this.etRingHost + "]  FILE [" + filename + "]  PORT [" + 
                 this.etRingPort + "]");
-        System.out.println("[ETSOURCE] --> connecting remotely : " + this.remoteConnection);
+        System.out.println("[ETSOURCE] -->>> connecting remotely : " + this.remoteConnection);
         try {
             this.connectionOK = true;
             String etFile = filename;
@@ -162,7 +164,7 @@ public class EvioETSource implements DataSource {
                             evioBuffer.order(buffer.order());                                                    
                             //EvioReader reader;
                             //System.out.println("------> parsing event # " + nevent + 
-                             //       " width length = " + length);
+                            //        " width length = " + length);
                             try {
                                 //reader = new EvioReader(buffer);
                                 EvioCompactReader reader = new EvioCompactReader(buffer);
@@ -180,8 +182,7 @@ public class EvioETSource implements DataSource {
                                         */
                                 //System.out.println("---> compact event buffer size = " + localBuffer.capacity());
                                 EvioDataEvent dataEvent = new EvioDataEvent(localBuffer,EvioFactory.getDictionary());
-                                this.readerEvents.add(dataEvent);
-                                
+                                this.readerEvents.add(dataEvent);                                
                             } catch (EvioException ex) {
                                 Logger.getLogger(EvioETSource.class.getName()).log(Level.SEVERE, null, ex);
                             }
@@ -305,6 +306,20 @@ public class EvioETSource implements DataSource {
             }
         }*/
         //}
+    }
+
+    @Override
+    public DataSourceType getType() {
+        return DataSourceType.STREAM;
+    }
+
+    @Override
+    public void waitForEvents() {
+        try {
+            this.loadEvents();
+        } catch (Exception e){
+            System.out.println("\n   >>>>> [evioETsource] error loading events\n");
+        }
     }
 }
           

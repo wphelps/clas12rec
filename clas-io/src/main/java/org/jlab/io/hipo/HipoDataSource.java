@@ -16,6 +16,7 @@ import org.jlab.io.evio.EvioDataDictionary;
 import org.jlab.io.evio.EvioDataEvent;
 import org.jlab.hipo.io.HipoReader;
 import org.jlab.hipo.io.HipoRecord;
+import org.jlab.io.base.DataSourceType;
 
 /**
  *
@@ -39,11 +40,12 @@ public class HipoDataSource implements DataSource {
     }
 
     public void open(File file) {
-        
+        this.open(file.getAbsolutePath());
     }
 
     public void open(String filename) {
         this.reader.open(filename);
+        /*
         HipoRecord header = this.reader.getHeaderRecord();
         int  ncount = header.getEventCount();
         System.out.println("[HipoDataSource] ---> dictionary record opened. # entries = " + ncount);
@@ -53,10 +55,10 @@ public class HipoDataSource implements DataSource {
             //System.out.println("init dictionary : " + descString);
             EvioDataDescriptor  descriptor = new EvioDataDescriptor(descString);
             this.dictionary.addDescriptor(descriptor);
-        }
+        }*/
         //this.dictionary.show();
-        this.minEventNumber = ncount;
-        this.currentEventNumber = ncount;
+        this.minEventNumber = 0;
+        this.currentEventNumber = 0;
         this.numberOfEvent      = this.reader.getEventCount();
     }
 
@@ -80,19 +82,22 @@ public class HipoDataSource implements DataSource {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
-    public DataEvent getNextEvent() {
+    public DataEvent getNextEvent() {        
         byte[] array             = this.reader.readEvent(this.currentEventNumber);
         this.currentEventNumber++;
-        EvioDataEvent  evioEvent = new EvioDataEvent(array,ByteOrder.LITTLE_ENDIAN,this.dictionary);        
+        HipoDataEvent  evioEvent = new HipoDataEvent(array,this.reader.getSchemaFactory());
         return evioEvent;
     }
 
     public DataEvent getPreviousEvent() {
-        if(this.currentEventNumber>this.minEventNumber){
-            this.currentEventNumber--;           
+        
+        if(this.currentEventNumber>this.minEventNumber+1){
+            this.currentEventNumber--; 
+            this.currentEventNumber--; 
         }
         byte[] array             = this.reader.readEvent(this.currentEventNumber);
-        EvioDataEvent  evioEvent = new EvioDataEvent(array,ByteOrder.LITTLE_ENDIAN,this.dictionary);        
+        this.currentEventNumber++;
+        HipoDataEvent  evioEvent = new HipoDataEvent(array,this.reader.getSchemaFactory());
         return evioEvent;
     }
 
@@ -100,18 +105,42 @@ public class HipoDataSource implements DataSource {
         if(index>=this.minEventNumber&&index<this.numberOfEvent){
             this.currentEventNumber = index;
             byte[] array             = this.reader.readEvent(this.currentEventNumber);
-            EvioDataEvent  evioEvent = new EvioDataEvent(array,ByteOrder.LITTLE_ENDIAN,this.dictionary);        
+            this.currentEventNumber++;
+            HipoDataEvent  evioEvent = new HipoDataEvent(array,this.reader.getSchemaFactory());
+            //EvioDataEvent  evioEvent = new EvioDataEvent(array,ByteOrder.LITTLE_ENDIAN,this.dictionary);        
             return evioEvent;
         }
         return null;
     }
     
     public void reset() {
-        
+        this.currentEventNumber = 0;
     }
 
     public int getCurrentIndex() {
         return this.currentEventNumber;
     }
-    
+        
+    public static void main(String[] args){
+        HipoDataSource reader = new HipoDataSource();
+        reader.open("test_hipoio.hipo");
+        int counter = 0;
+        while(reader.hasEvent()==true){
+            DataEvent  event = reader.getNextEvent();
+            System.out.println("EVENT # " + counter);
+            event.show();
+            counter++;
+        }
+    }
+
+    @Override
+    public DataSourceType getType() {
+        return DataSourceType.FILE;        
+        //throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    @Override
+    public void waitForEvents() {
+        
+    }
 }
